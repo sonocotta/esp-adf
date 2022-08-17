@@ -4,6 +4,13 @@ cmake_minimum_required(VERSION 3.5)
 
 set(EXTRA_COMPONENT_DIRS ./components)
 
+if(NOT DEFINED $ENV{ADF_PATH})
+    set(ENV{ADF_PATH} $ENV{IDF_PATH}/..)
+endif()
+
+message(IDF_PATH = $ENV{IDF_PATH})
+message(ADF_PATH = $ENV{ADF_PATH})
+
 include($ENV{ADF_PATH}/CMakeLists.txt)
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 

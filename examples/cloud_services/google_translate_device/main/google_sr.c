@@ -114,7 +114,7 @@ static esp_err_t _http_stream_writer_event_handle(http_stream_event_msg_t *msg)
     }
 
     if (msg->event_id == HTTP_STREAM_ON_REQUEST) {
-        // ESP_LOGI(TAG, "[ + ] HTTP client HTTP_STREAM_ON_REQUEST, lenght=%d, begin=%d", msg->buffer_len, sr->is_begin);
+        ESP_LOGI(TAG, "[ + ] HTTP client HTTP_STREAM_ON_REQUEST, lenght=%d, begin=%d", msg->buffer_len, sr->is_begin);
         /* Write first chunk */
         if (sr->is_begin) {
             sr->is_begin = false;

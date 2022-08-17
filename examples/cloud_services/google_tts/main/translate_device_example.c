@@ -23,8 +23,8 @@
 #include "periph_button.h"
 #include "periph_wifi.h"
 #include "periph_led.h"
+#include "periph_console.h"
 #include "google_tts.h"
-#include "google_sr.h"
 #include "google_translate.h"
 #include "board.h"
 
@@ -38,7 +38,6 @@
 
 static const char *TAG = "GOOGLE_TRANSLATION_EXAMPLE";
 
-#define GOOGLE_SR_LANG              CONFIG_TRANSLATE_LANG_FROM
 #define GOOGLE_TRANSLATE_LANG_FROM  CONFIG_TRANSLATE_LANG_FROM
 #define GOOGLE_TRANSLATE_LANG_TO    CONFIG_TRANSLATE_LANG_TO
 #define GOOGLE_TTS_LANG             CONFIG_TRANSLATE_LANG_TO
@@ -48,14 +47,56 @@ static const char *TAG = "GOOGLE_TRANSLATION_EXAMPLE";
 
 #define EXAMPLE_RECORD_PLAYBACK_SAMPLE_RATE (16000)
 
-esp_periph_handle_t led_handle = NULL;
-void google_sr_begin(google_sr_handle_t sr)
+google_tts_handle_t tts;
+
+static esp_err_t cli_say(esp_periph_handle_t periph, int argc, char *argv[])
 {
-    if (led_handle) {
-        periph_led_blink(led_handle, get_green_led_gpio(), 500, 500, true, -1, 0);
+    char * phrase;
+    if (argc == 1) {
+        phrase = argv[0];
+    } else {
+        ESP_LOGE(TAG, "Invalid phrase parameter");
+        return ESP_ERR_INVALID_ARG;
     }
-    ESP_LOGW(TAG, "Start speaking now");
+    ESP_LOGI(TAG, "Say %s", phrase);
+    google_tts_start(tts, phrase, GOOGLE_TTS_LANG, GOOGLE_TTS_VOICE);
+    return ESP_OK;
 }
+
+static esp_err_t cli_translate(esp_periph_handle_t periph, int argc, char *argv[])
+{
+    char * phrase;
+    if (argc == 1) {
+        phrase = argv[0];
+    } else {
+        ESP_LOGE(TAG, "Invalid phrase parameter");
+        return ESP_ERR_INVALID_ARG;
+    }
+    ESP_LOGI(TAG, "Translate %s", phrase);
+    char *translated_text = google_translate(phrase, GOOGLE_TRANSLATE_LANG_FROM, GOOGLE_TRANSLATE_LANG_TO, CONFIG_GOOGLE_API_KEY);
+    if (translated_text == NULL) {
+        return ESP_FAIL;
+    }
+
+    ESP_LOGI(TAG, "Translated text = %s", translated_text);
+    // google_tts_start(tts, translated_text, GOOGLE_TTS_LANG, GOOGLE_TTS_VOICE);
+
+    return ESP_OK;
+}
+
+const periph_console_cmd_t cli_cmd[] = {
+    { .cmd = "say",       .id = 0,  .help = "Say phrase",       .func = cli_say },
+    { .cmd = "translate", .id = 1,  .help = "Translate phrase", .func = cli_translate },
+};
+
+// esp_periph_handle_t led_handle = NULL;
+// void google_sr_begin(google_sr_handle_t sr)
+// {
+//     if (led_handle) {
+//         periph_led_blink(led_handle, get_green_led_gpio(), 500, 500, true, -1, 0);
+//     }
+//     ESP_LOGW(TAG, "Start speaking now");
+// }
 
 void translate_task(void *pv)
 {
@@ -72,7 +113,7 @@ void translate_task(void *pv)
     tcpip_adapter_init();
 #endif
 
-    ESP_LOGI(TAG, "[ 1 ] Initialize Buttons & Connect to Wi-Fi network, ssid=%s", CONFIG_WIFI_SSID);
+    ESP_LOGI(TAG, "[ 1 ] Connect to Wi-Fi network, ssid=%s", CONFIG_WIFI_SSID);
     // Initialize peripherals management
     esp_periph_config_t periph_cfg = DEFAULT_ESP_PERIPH_SET_CONFIG();
     esp_periph_set_handle_t set = esp_periph_set_init(&periph_cfg);
@@ -84,23 +125,23 @@ void translate_task(void *pv)
     esp_periph_handle_t wifi_handle = periph_wifi_init(&wifi_cfg);
 
     // Initialize Button peripheral
-    periph_button_cfg_t btn_cfg = {
-        .gpio_mask = (1ULL << get_input_mode_id()) | (1ULL << get_input_rec_id()),
-    };
-    esp_periph_handle_t button_handle = periph_button_init(&btn_cfg);
+    // periph_button_cfg_t btn_cfg = {
+    //     .gpio_mask = (1ULL << get_input_mode_id()) | (1ULL << get_input_rec_id()),
+    // };
+    // esp_periph_handle_t button_handle = periph_button_init(&btn_cfg);
 
-    periph_led_cfg_t led_cfg = {
-        .led_speed_mode = LEDC_LOW_SPEED_MODE,
-        .led_duty_resolution = LEDC_TIMER_10_BIT,
-        .led_timer_num = LEDC_TIMER_0,
-        .led_freq_hz = 5000,
-    };
-    led_handle = periph_led_init(&led_cfg);
+    // periph_led_cfg_t led_cfg = {
+    //     .led_speed_mode = LEDC_LOW_SPEED_MODE,
+    //     .led_duty_resolution = LEDC_TIMER_10_BIT,
+    //     .led_timer_num = LEDC_TIMER_0,
+    //     .led_freq_hz = 5000,
+    // };
+    // led_handle = periph_led_init(&led_cfg);
 
     // Start wifi & button peripheral
-    esp_periph_start(set, button_handle);
+    // esp_periph_start(set, button_handle);
     esp_periph_start(set, wifi_handle);
-    esp_periph_start(set, led_handle);
+    // esp_periph_start(set, led_handle);
 
     periph_wifi_wait_for_connected(wifi_handle, portMAX_DELAY);
 
@@ -108,28 +149,37 @@ void translate_task(void *pv)
     audio_board_handle_t board_handle = audio_board_init();
     audio_hal_ctrl_codec(board_handle->audio_hal, AUDIO_HAL_CODEC_MODE_BOTH, AUDIO_HAL_CTRL_START);
 
-    google_sr_config_t sr_config = {
-        .api_key = CONFIG_GOOGLE_API_KEY,
-        .lang_code = GOOGLE_SR_LANG,
-        .record_sample_rates = EXAMPLE_RECORD_PLAYBACK_SAMPLE_RATE,
-        .encoding = ENCODING_LINEAR16,
-        .on_begin = google_sr_begin,
-    };
-    google_sr_handle_t sr = google_sr_init(&sr_config);
+    // google_sr_config_t sr_config = {
+    //     .api_key = CONFIG_GOOGLE_API_KEY,
+    //     .lang_code = GOOGLE_SR_LANG,
+    //     .record_sample_rates = EXAMPLE_RECORD_PLAYBACK_SAMPLE_RATE,
+    //     .encoding = ENCODING_LINEAR16,
+    //     .on_begin = google_sr_begin,
+    // };
+    // google_sr_handle_t sr = google_sr_init(&sr_config);
 
     google_tts_config_t tts_config = {
         .api_key = CONFIG_GOOGLE_API_KEY,
         .playback_sample_rate = EXAMPLE_RECORD_PLAYBACK_SAMPLE_RATE,
     };
-    google_tts_handle_t tts = google_tts_init(&tts_config);
+    tts = google_tts_init(&tts_config);
 
-    ESP_LOGI(TAG, "[ 4 ] Set up  event listener");
+    ESP_LOGI(TAG, "[ 3 ] Set up console");
+    periph_console_cfg_t console_cfg = {
+        .command_num = sizeof(cli_cmd) / sizeof(periph_console_cmd_t),
+        .commands = cli_cmd,
+        .buffer_size = 384,
+    };
+    esp_periph_handle_t console_handle = periph_console_init(&console_cfg);
+    esp_periph_start(set, console_handle);
+
+    ESP_LOGI(TAG, "[ 4 ] Set up event listener");
     audio_event_iface_cfg_t evt_cfg = AUDIO_EVENT_IFACE_DEFAULT_CFG();
     audio_event_iface_handle_t evt = audio_event_iface_init(&evt_cfg);
 
-    ESP_LOGI(TAG, "[4.1] Listening event from the pipeline");
-    google_sr_set_listener(sr, evt);
-    google_tts_set_listener(tts, evt);
+    // ESP_LOGI(TAG, "[4.1] Listening event from the pipeline");
+    // google_sr_set_listener(sr, evt);
+    // google_tts_set_listener(tts, evt);
 
     ESP_LOGI(TAG, "[4.2] Listening event from peripherals");
     audio_event_iface_set_listener(esp_periph_set_get_event_iface(set), evt);
@@ -167,31 +217,32 @@ void translate_task(void *pv)
         if (msg.cmd == PERIPH_BUTTON_PRESSED) {
             google_tts_stop(tts);
             ESP_LOGI(TAG, "[ * ] Resuming pipeline");
-            google_sr_start(sr);
+            // google_sr_start(sr);
         } else if (msg.cmd == PERIPH_BUTTON_RELEASE || msg.cmd == PERIPH_BUTTON_LONG_RELEASE) {
             ESP_LOGI(TAG, "[ * ] Stop pipeline");
 
-            periph_led_stop(led_handle, get_green_led_gpio());
+            // periph_led_stop(led_handle, get_green_led_gpio());
 
-            char *original_text = google_sr_stop(sr);
-            if (original_text == NULL) {
-                continue;
-            }
+            // char *original_text = "Hello"; 
+            //     google_sr_stop(sr);
+            // if (original_text == NULL) {
+            //     continue;
+            // }
 
-            ESP_LOGI(TAG, "Original text = %s", original_text);
-            char *translated_text = google_translate(original_text, GOOGLE_TRANSLATE_LANG_FROM, GOOGLE_TRANSLATE_LANG_TO, CONFIG_GOOGLE_API_KEY);
-            if (translated_text == NULL) {
-                continue;
-            }
+            // ESP_LOGI(TAG, "Original text = %s", original_text);
+            // char *translated_text = google_translate(original_text, GOOGLE_TRANSLATE_LANG_FROM, GOOGLE_TRANSLATE_LANG_TO, CONFIG_GOOGLE_API_KEY);
+            // if (translated_text == NULL) {
+            //     continue;
+            // }
 
-            ESP_LOGI(TAG, "Translated text = %s", translated_text);
-            google_tts_start(tts, translated_text, GOOGLE_TTS_LANG, GOOGLE_TTS_VOICE);
+            // ESP_LOGI(TAG, "Translated text = %s", translated_text);
+            // google_tts_start(tts, translated_text, GOOGLE_TTS_LANG, GOOGLE_TTS_VOICE);
         }
 
     }
 
     ESP_LOGI(TAG, "[ 6 ] Stop audio_pipeline");
-    google_sr_destroy(sr);
+    // google_sr_destroy(sr);
     google_tts_destroy(tts);
     /* Stop all periph before removing the listener */
     esp_periph_set_stop_all(set);

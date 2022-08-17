@@ -107,4 +107,22 @@ set(COMPONENT_SRCS
 )
 endif()
 
+if (CONFIG_ESP_AI_THINKER_V2_2_BOARD)
+message(STATUS "Current board name is " CONFIG_ESP_AI_THINKER_V2_2_BOARD)
+list(APPEND COMPONENT_ADD_INCLUDEDIRS ./ai_thinker_audio_kit_v2_2)
+set(COMPONENT_SRCS
+./ai_thinker_audio_kit_v2_2/board.c
+./ai_thinker_audio_kit_v2_2/board_pins_config.c
+)
+endif()
+
+if (CONFIG_LOUD_ESP_MINI_BOARD)
+message(STATUS "Current board name is " CONFIG_LOUD_ESP_MINI_BOARD)
+list(APPEND COMPONENT_ADD_INCLUDEDIRS ./loud_esp_mini)
+set(COMPONENT_SRCS
+./loud_esp_mini/board.c
+./loud_esp_mini/board_pins_config.c
+)
+endif()
+
 register_component()

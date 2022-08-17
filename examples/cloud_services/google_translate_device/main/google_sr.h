@@ -32,7 +32,7 @@
 extern "C" {
 #endif
 
-#define DEFAULT_SR_BUFFER_SIZE (2048)
+#define DEFAULT_SR_BUFFER_SIZE (1024 * 8)
 
 /**
  * Google Cloud Speech-to-Text audio encoding

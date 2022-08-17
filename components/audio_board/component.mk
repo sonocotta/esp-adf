@@ -51,3 +51,13 @@ ifdef CONFIG_ESP32_C3_LYRA_V2_BOARD
 COMPONENT_ADD_INCLUDEDIRS += ./esp32_c3_lyra
 COMPONENT_SRCDIRS += ./esp32_c3_lyra
 endif
+
+ifdef CONFIG_ESP_AI_THINKER_V2_2_BOARD
+COMPONENT_ADD_INCLUDEDIRS += ./ai_thinker_audio_kit_v2_2
+COMPONENT_SRCDIRS += ./ai_thinker_audio_kit_v2_2
+endif
+
+ifdef CONFIG_LOUD_ESP_MINI_BOARD
+COMPONENT_ADD_INCLUDEDIRS += ./loud_esp_mini
+COMPONENT_SRCDIRS += ./loud_esp_mini
+endif

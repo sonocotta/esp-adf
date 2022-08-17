@@ -46,7 +46,7 @@
 static const char *TAG = "GOOGLE_TTS";
 
 
-#define GOOGLE_TTS_ENDPOINT         "https://texttospeech.googleapis.com/v1beta1/text:synthesize?key=%s"
+#define GOOGLE_TTS_ENDPOINT         "https://texttospeech.googleapis.com/v1/text:synthesize?key=%s"
 #define GOOGLE_TTS_TEMPLATE         "{"\
                                         "\"audioConfig\": { \"audioEncoding\" : \"MP3\", \"sampleRateHertz\": %d },"\
                                         "\"voice\": { \"languageCode\" : \"%s\", \"name\" : \"%s\" },"\
@@ -85,6 +85,7 @@ static esp_err_t _http_stream_reader_event_handle(http_stream_event_msg_t *msg)
         tts->tts_total_read = 0;
         tts->is_begin = true;
         int payload_len = snprintf(tts->buffer, tts->buffer_size, GOOGLE_TTS_TEMPLATE, tts->sample_rate, tts->lang_code, tts->lang_voice, tts->text);
+        ESP_LOGI(TAG, "[ + ] HTTP client payload: lenght=%d, content=%s", payload_len, tts->buffer);
         esp_http_client_set_post_field(http, tts->buffer, payload_len);
         esp_http_client_set_method(http, HTTP_METHOD_POST);
         esp_http_client_set_header(http, "Content-Type", "application/json");
@@ -92,8 +93,36 @@ static esp_err_t _http_stream_reader_event_handle(http_stream_event_msg_t *msg)
         return ESP_OK;
     }
 
+    if (msg->event_id == HTTP_STREAM_ON_REQUEST) {
+        ESP_LOGI(TAG, "[ + ] HTTP client HTTP_STREAM_ON_REQUEST, lenght=%d", msg->buffer_len);
+        return ESP_OK;
+    }
+
+    if (msg->event_id == HTTP_STREAM_POST_REQUEST) {
+        ESP_LOGI(TAG, "[ + ] HTTP client HTTP_STREAM_POST_REQUEST, write end chunked marker");
+        return ESP_OK;
+    }
+
+    if (msg->event_id == HTTP_STREAM_FINISH_REQUEST) {
+        int read_len = esp_http_client_read(http, (char *)tts->buffer, tts->buffer_size);
+        ESP_LOGI(TAG, "[ + ] HTTP client HTTP_STREAM_FINISH_REQUEST, read_len=%d", read_len);
+        if (read_len <= 0) {
+            return ESP_FAIL;
+        }
+        if (read_len > tts->buffer_size - 1) {
+            read_len = tts->buffer_size - 1;
+        }
+        tts->buffer[read_len] = 0;
+        ESP_LOGI(TAG, "Got HTTP Response = %s", (char *)tts->buffer);
+        // if (tts->response_text) {
+        //     free(tts->response_text);
+        // }
+        // sr->response_text = json_get_token_value(sr->buffer, "transcript");
+        return ESP_OK;
+    }
+
     if (msg->event_id == HTTP_STREAM_ON_RESPONSE) {
-        ESP_LOGD(TAG, "[ + ] HTTP client HTTP_STREAM_ON_RESPONSE, lenght=%d", msg->buffer_len);
+        ESP_LOGI(TAG, "[ + ] HTTP client HTTP_STREAM_ON_RESPONSE, lenght=%d", msg->buffer_len);
         /* Read first chunk */
         int process_data_len = 0;
         char *data_ptr = tts->buffer;
@@ -102,7 +131,7 @@ static esp_err_t _http_stream_reader_event_handle(http_stream_event_msg_t *msg)
         align_read -= tts->remain_len;
         read_len = esp_http_client_read(http, tts->remain_len + tts->buffer, align_read);
 
-        ESP_LOGD(TAG, "Need read = %d, read_len=%d, tts->remain_len=%d", align_read, read_len, tts->remain_len);
+        ESP_LOGI(TAG, "Need read = %d, read_len=%d, tts->remain_len=%d", align_read, read_len, tts->remain_len);
 
         if (read_len <= 0) {
             return read_len;
@@ -124,7 +153,7 @@ static esp_err_t _http_stream_reader_event_handle(http_stream_event_msg_t *msg)
             process_data_len--;
         }
 
-        ESP_LOGD(TAG, "process_data_len=%d", process_data_len);
+        ESP_LOGI(TAG, "process_data_len=%d", process_data_len);
 
         unsigned int mp3_len = 0;
         int keep_next_time = 0;
@@ -140,15 +169,6 @@ static esp_err_t _http_stream_reader_event_handle(http_stream_event_msg_t *msg)
             return ESP_FAIL;
         }
         return mp3_len;
-    }
-
-    if (msg->event_id == HTTP_STREAM_POST_REQUEST) {
-        ESP_LOGI(TAG, "[ + ] HTTP client HTTP_STREAM_POST_REQUEST, write end chunked marker");
-
-    }
-
-    if (msg->event_id == HTTP_STREAM_FINISH_REQUEST) {
-
     }
 
     return ESP_OK;

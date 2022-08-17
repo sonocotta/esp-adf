@@ -5,6 +5,13 @@
 # in this exact order for cmake to work correctly
 cmake_minimum_required(VERSION 3.5)
 
+if(NOT DEFINED $ENV{ADF_PATH})
+    set(ENV{ADF_PATH} $ENV{IDF_PATH}/..)
+endif()
+
+message(IDF_PATH = $ENV{IDF_PATH})
+message(ADF_PATH = $ENV{ADF_PATH})
+
 include($ENV{ADF_PATH}/CMakeLists.txt)
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(play_mp3_control)
